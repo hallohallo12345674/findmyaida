@@ -1,0 +1,45 @@
+{
+  "name": "findmyaida",
+  "version": "0.4.0",
+  "description": "FindMyAIDA – alle Buchungsoptionen einer AIDA-Reise im Terminal vergleichen",
+  "repository": "github:hallohallo12345674/findmyaida",
+  "license": "GPL-3.0-or-later",
+  "private": true,
+  "type": "module",
+  "bin": {
+    "findmyaida": "dist/cli.js",
+    "fma": "dist/cli.js",
+    "aida-tui": "dist/cli.js"
+  },
+  "scripts": {
+    "dev": "tsx src/cli.tsx",
+    "start": "node dist/cli.js",
+    "build": "tsup",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "check": "npm run typecheck && npm test",
+    "release": "tsx scripts/build-release.ts",
+    "icons": "tsx scripts/make-icons.ts",
+    "readme": "tsx scripts/readme-assets.ts",
+    "pixel-art": "tsx scripts/export-pixel-art.ts"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "dependencies": {
+    "ink": "6.8.0",
+    "react": "19.3.1",
+    "ws": "8.23.0",
+    "zod": "4.6.7"
+  },
+  "devDependencies": {
+    "@types/node": "24.19.2",
+    "@types/react": "19.3.0",
+    "@types/ws": "8.18.2",
+    "ink-testing-library": "4.0.0",
+    "tsup": "8.5.1",
+    "tsx": "4.23.15",
+    "typescript": "5.9.3",
+    "vitest": "4.1.12"
+  }
+}

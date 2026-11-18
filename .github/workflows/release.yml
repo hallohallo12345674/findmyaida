@@ -1,0 +1,98 @@
+# Baut die Release-Archive (Node-Laufzeit + gebündeltes FindMyAIDA) für macOS, Linux und Windows, prüft den
+# Installer auf allen drei Systemen und veröffentlicht bei einem Tag v* ein GitHub-Release.
+name: Release
+
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+
+# Nur der Job publish darf schreiben; Bau und Tests laufen mit Leserechten.
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - run: npm run check
+      - name: Archive bauen
+        run: npm run release
+        env:
+          FINDMYAIDA_REPO: ${{ github.repository }}
+      - uses: actions/upload-artifact@v4
+        with:
+          name: release
+          path: release/
+          if-no-files-found: error
+
+  smoke:
+    needs: build
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, ubuntu-24.04-arm, macos-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: release
+          path: release
+      - name: Installieren, starten, entfernen (macOS/Linux)
+        if: runner.os != 'Windows'
+        shell: bash
+        run: |
+          export HOME="$(mktemp -d)" SHELL=/bin/bash
+          sh release/install.sh --from release --no-start
+          # Der Befehl muss in einer neuen Shell gefunden werden (macOS-Terminal: Login-Shell, Linux: interaktiv).
+          if [ "$RUNNER_OS" = macOS ]; then found=$(bash -lic 'command -v findmyaida' 2>/dev/null); else found=$(bash -ic 'command -v findmyaida' 2>/dev/null); fi
+          echo "findmyaida: $found"; test -n "$found"
+          findmyaida_bin="$HOME/.local/bin/findmyaida"
+          test "$("$findmyaida_bin" --version)" = "$(cat "$HOME/.local/share/findmyaida/current/VERSION")"
+          "$findmyaida_bin" --demo prices PR07261128 | head -n 2
+          if [ "$RUNNER_OS" = macOS ]; then test -x "$HOME/Applications/FindMyAIDA.app/Contents/MacOS/FindMyAIDA"; else test -f "$HOME/.local/share/applications/findmyaida.desktop"; fi
+          "$findmyaida_bin" uninstall
+          test ! -e "$HOME/.local/share/findmyaida"
+      - name: Installieren, starten, entfernen (Windows, PowerShell 7)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          ./release/install.ps1 -From release -NoStart
+          $env:Path = [Environment]::GetEnvironmentVariable('Path', 'User') + ';' + $env:Path
+          findmyaida --version
+          findmyaida --demo prices PR07261128 | Select-Object -First 2
+          if (-not (Test-Path ([IO.Path]::Combine([Environment]::GetFolderPath('Programs'), 'FindMyAIDA.lnk')))) { throw 'Startmenü-Verknüpfung fehlt' }
+          & "$env:LOCALAPPDATA\Programs\FindMyAIDA\install.ps1" -Uninstall
+      - name: Installieren (Windows PowerShell 5.1, Standard auf Windows 10/11)
+        if: runner.os == 'Windows'
+        shell: powershell
+        run: |
+          .\release\install.ps1 -From release -NoStart
+          & "$env:LOCALAPPDATA\Programs\FindMyAIDA\findmyaida.cmd" --version
+          & "$env:LOCALAPPDATA\Programs\FindMyAIDA\install.ps1" -Uninstall
+
+  publish:
+    needs: smoke
+    if: startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: release
+          path: release
+      - name: Release anlegen
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "$GITHUB_REF_NAME" release/* \
+            --repo "$GITHUB_REPOSITORY" \
+            --title "FindMyAIDA ${GITHUB_REF_NAME#v}" \
+            --notes "Installation: macOS/Linux \`curl -fsSL https://github.com/$GITHUB_REPOSITORY/releases/latest/download/install.sh | sh\` · Windows \`irm https://github.com/$GITHUB_REPOSITORY/releases/latest/download/install.ps1 | iex\`"

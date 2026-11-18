@@ -1,0 +1,31 @@
+{
+  "manifest_version": 3,
+  "name": "FindMyAIDA Bridge",
+  "version": "0.4.0",
+  "description": "Verbindet die lokale Terminal-App FindMyAIDA mit aida.de. Fragt nur Reisesuche und Preise ab, ausgeführt in einem normalen aida.de-Tab.",
+  "minimum_chrome_version": "116",
+  "permissions": [
+    "scripting",
+    "alarms"
+  ],
+  "host_permissions": [
+    "https://aida.de/*"
+  ],
+  "background": {
+    "service_worker": "background.js"
+  },
+  "content_scripts": [
+    {
+      "matches": [
+        "https://aida.de/*"
+      ],
+      "js": [
+        "content.js"
+      ],
+      "run_at": "document_idle"
+    }
+  ],
+  "action": {
+    "default_title": "FindMyAIDA Bridge"
+  }
+}
